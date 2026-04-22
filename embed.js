@@ -1,7 +1,7 @@
 // Ozford Chatbot Embed Script
 // Replace GITHUB_PAGES_URL with your actual GitHub Pages URL
 (function () {
-  var CHATBOT_URL = 'https://YOUR_USERNAME.github.io/ozford-chatbot/';
+  var CHATBOT_URL = 'https://abhij9920.github.io/Ozford-Chatbot/';
 
   var iframe = document.createElement('iframe');
   iframe.src = CHATBOT_URL;
