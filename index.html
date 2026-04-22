@@ -234,6 +234,19 @@ bubble.addEventListener('click', () => {
   window.parent.postMessage(isOpen ? 'oz-open' : 'oz-close', '*');
 });
 
+// If loaded inside embed, hide bubble and show panel immediately
+if (window.location.search.includes('embedded=true')) {
+  document.getElementById('oz-bubble').style.display = 'none';
+  document.getElementById('oz-panel').style.position = 'static';
+  document.getElementById('oz-panel').style.transform = 'none';
+  document.getElementById('oz-panel').style.opacity = '1';
+  document.getElementById('oz-panel').style.pointerEvents = 'all';
+  document.getElementById('oz-panel').style.width = '100%';
+  document.getElementById('oz-panel').style.borderRadius = '18px';
+  document.getElementById('oz-panel').style.maxHeight = '100vh';
+  initChat();
+}
+
 function initChat() {
   addBotMessage(DATA.welcome.text, DATA.welcome.replies);
 }
