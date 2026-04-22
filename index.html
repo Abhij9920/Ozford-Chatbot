@@ -230,6 +230,8 @@ bubble.addEventListener('click', () => {
   panel.classList.toggle('open', isOpen);
   bubble.classList.toggle('open', isOpen);
   if (isOpen && messagesEl.children.length === 0) initChat();
+  // Tell parent page to resize the iframe
+  window.parent.postMessage(isOpen ? 'oz-open' : 'oz-close', '*');
 });
 
 function initChat() {
