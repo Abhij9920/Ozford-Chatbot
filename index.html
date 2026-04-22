@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ozford Chatbot</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: transparent; }
+
+/* Bubble */
+#oz-bubble {
+  position: fixed; bottom: 28px; right: 28px;
+  width: 62px; height: 62px; border-radius: 50%;
+  background: #003366; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 18px rgba(0,51,102,0.35);
+  transition: transform 0.18s, background 0.18s; z-index: 9999;
+}
+#oz-bubble:hover { background: #004080; transform: scale(1.07); }
+#oz-bubble .icon-chat, #oz-bubble .icon-close { position: absolute; transition: opacity 0.2s, transform 0.2s; }
+#oz-bubble .icon-close { opacity: 0; transform: rotate(-90deg); }
+#oz-bubble.open .icon-chat { opacity: 0; transform: rotate(90deg); }
+#oz-bubble.open .icon-close { opacity: 1; transform: rotate(0deg); }
+
+/* Panel */
+#oz-panel {
+  position: fixed; bottom: 104px; right: 28px;
+  width: 360px; border-radius: 18px;
+  background: #fff; box-shadow: 0 8px 40px rgba(0,0,0,0.16);
+  display: flex; flex-direction: column; overflow: hidden;
+  z-index: 9998; max-height: 540px;
+  transform: scale(0.92) translateY(20px); opacity: 0; pointer-events: none;
+  transition: transform 0.22s cubic-bezier(.4,0,.2,1), opacity 0.22s;
+}
+#oz-panel.open { transform: scale(1) translateY(0); opacity: 1; pointer-events: all; }
+
+/* Header */
+#oz-header {
+  background: #003366; color: #fff;
+  padding: 14px 16px; display: flex; align-items: center; gap: 11px; flex-shrink: 0;
+}
+#oz-avatar {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+#oz-avatar svg { width: 22px; height: 22px; fill: #fff; }
+#oz-header-info { flex: 1; }
+#oz-header-info strong { display: block; font-size: 14px; font-weight: 600; }
+#oz-header-info span { font-size: 11.5px; opacity: 0.72; }
+#oz-online { display: inline-block; width: 7px; height: 7px; background: #4ade80; border-radius: 50%; margin-right: 4px; }
+
+/* Messages */
+#oz-messages {
+  flex: 1; overflow-y: auto; padding: 16px 13px;
+  display: flex; flex-direction: column; gap: 10px;
+  background: #f4f6f9; min-height: 0;
+}
+#oz-messages::-webkit-scrollbar { width: 3px; }
+#oz-messages::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+
+.oz-msg { max-width: 85%; font-size: 13.5px; line-height: 1.55; word-break: break-word; }
+.oz-msg.bot { align-self: flex-start; }
+.oz-msg.user { align-self: flex-end; }
+
+.oz-bubble-bot {
+  background: #fff; color: #1a1a1a;
+  padding: 10px 13px; border-radius: 4px 14px 14px 14px;
+  border: 1px solid #e8eaee;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.oz-bubble-user {
+  background: #003366; color: #fff;
+  padding: 10px 13px; border-radius: 14px 14px 4px 14px;
+}
+.oz-msg a { color: #003366; font-weight: 500; text-decoration: underline; }
+.oz-msg.user a { color: #a8c4e8; }
+
+/* Quick reply buttons */
+#oz-replies {
+  padding: 10px 13px 4px; display: flex; flex-wrap: wrap;
+  gap: 7px; background: #f4f6f9; flex-shrink: 0;
+}
+.oz-reply-btn {
+  background: #fff; border: 1.5px solid #003366; color: #003366;
+  border-radius: 20px; padding: 6px 13px; font-size: 12.5px;
+  cursor: pointer; transition: background 0.15s, color 0.15s; white-space: nowrap;
+  font-family: inherit; font-weight: 500;
+}
+.oz-reply-btn:hover { background: #003366; color: #fff; }
+
+/* Footer */
+#oz-footer {
+  padding: 10px 13px 14px; background: #f4f6f9;
+  border-top: 1px solid #e5e7eb; flex-shrink: 0;
+}
+#oz-footer p { font-size: 11px; color: #999; text-align: center; }
+
+/* Typing indicator */
+.oz-typing { display: flex; align-items: center; gap: 4px; padding: 10px 13px; }
+.oz-typing span {
+  width: 7px; height: 7px; background: #bbb; border-radius: 50%;
+  animation: bounce 1.2s infinite;
+}
+.oz-typing span:nth-child(2) { animation-delay: 0.2s; }
+.oz-typing span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
+
+@media (max-width: 420px) {
+  #oz-panel { width: calc(100vw - 16px); right: 8px; bottom: 92px; }
+  #oz-bubble { bottom: 16px; right: 16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Bubble toggle -->
+<button id="oz-bubble" aria-label="Open Ozford chat">
+  <span class="icon-chat">
+    <svg viewBox="0 0 24 24"><path d="M20 2H4a2 2 0 00-2 2v18l4-4h14a2 2 0 002-2V4a2 2 0 00-2-2zm-2 10H6V10h12v2zm0-3H6V7h12v2z"/></svg>
+  </span>
+  <span class="icon-close">
+    <svg viewBox="0 0 24 24" fill="white" width="24" height="24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+  </span>
+</button>
+
+<!-- Chat panel -->
+<div id="oz-panel" role="dialog" aria-label="Ozford Assistant">
+  <div id="oz-header">
+    <div id="oz-avatar">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+    </div>
+    <div id="oz-header-info">
+      <strong>Ozford Assistant</strong>
+      <span><span id="oz-online"></span>Online — here to help</span>
+    </div>
+  </div>
+
+  <div id="oz-messages"></div>
+  <div id="oz-replies"></div>
+  <div id="oz-footer">
+    <p>Ozford Institute of Higher Education · <a href="https://ozford.edu.au/about/contact-us/" target="_blank" style="color:#003366;">Contact Us</a></p>
+  </div>
+</div>
+
+<script>
+const DATA = {
+  welcome: {
+    text: "👋 Hi there! Welcome to Ozford Institute. I'm here to help you with information about our courses, admissions, and more.\n\nWhat would you like to know?",
+    replies: ["📚 Courses offered", "🎓 How to apply", "💰 Fees & payment", "📍 Location & campus", "📞 Contact us", "🌏 International students"]
+  },
+
+  nodes: {
+    "📚 Courses offered": {
+      text: "Ozford offers a range of Higher Education programs. Which level are you interested in?",
+      replies: ["🎓 Postgraduate courses", "📖 Undergraduate courses", "🔙 Back to start"]
+    },
+    "🎓 Postgraduate courses": {
+      text: "Our postgraduate programs include:\n\n• <a href='https://ozford.edu.au/study/postgraduate/master-of-information-technology/' target='_blank'>Master of Information Technology (MIT)</a>\n• <a href='https://ozford.edu.au/study/postgraduate/master-of-business-administration/' target='_blank'>Master of Business Administration (MBA)</a>\n• <a href='https://ozford.edu.au/study/postgraduate/master-of-professional-accounting/' target='_blank'>Master of Professional Accounting (MPA)</a>\n• <a href='https://ozford.edu.au/study/postgraduate/graduate-diploma-in-information-technology/' target='_blank'>Graduate Diploma in IT</a>\n• <a href='https://ozford.edu.au/study/postgraduate/graduate-diploma-in-management/' target='_blank'>Graduate Diploma in Management</a>\n• Graduate Certificate in IT\n• Graduate Certificate in Management\n\nClick any course to learn more on our website.",
+      replies: ["🎓 How to apply", "💰 Fees & payment", "🔙 Back to courses"]
+    },
+    "📖 Undergraduate courses": {
+      text: "Our undergraduate programs include:\n\n• <a href='https://ozford.edu.au/study/undergraduate/bachelor-of-cyber-security/' target='_blank'>Bachelor of Cyber Security</a>\n• <a href='https://ozford.edu.au/study/undergraduate/bachelor-of-information-systems/' target='_blank'>Bachelor of Information Systems</a>\n• <a href='https://ozford.edu.au/study/undergraduate/bachelor-of-business-accounting/' target='_blank'>Bachelor of Business (Accounting)</a>\n• <a href='https://ozford.edu.au/study/undergraduate/bachelor-of-business/' target='_blank'>Bachelor of Business</a>\n• <a href='https://ozford.edu.au/study/undergraduate/diploma-of-business/' target='_blank'>Diploma of Business</a>\n\nClick any course to see full details.",
+      replies: ["🎓 How to apply", "💰 Fees & payment", "🔙 Back to courses"]
+    },
+    "🔙 Back to courses": {
+      text: "Which level are you interested in?",
+      replies: ["🎓 Postgraduate courses", "📖 Undergraduate courses", "🔙 Back to start"]
+    },
+
+    "🎓 How to apply": {
+      text: "Are you a domestic or international student?",
+      replies: ["🏠 Domestic student", "🌏 International student", "🔙 Back to start"]
+    },
+    "🏠 Domestic student": {
+      text: "To apply as a domestic student:\n\n1. Prepare your documents (transcripts, ID, etc.)\n2. Visit our <a href='https://ozford.edu.au/admissions/how-to-apply/domestic-student/' target='_blank'>Domestic Application page</a>\n3. Register as an applicant and complete your application\n4. You can save and return to your application before submitting\n\n📋 Check <a href='https://ozford.edu.au/admissions/entry-requirements/higher-education/' target='_blank'>Entry Requirements</a> before applying.",
+      replies: ["💰 Fees & payment", "📅 Intakes & dates", "📞 Contact us", "🔙 Back to start"]
+    },
+    "🌏 International students": {
+      text: "Ozford warmly welcomes international students! Here's what you need to know:\n\n• Apply via our <a href='https://ozford.edu.au/admissions/how-to-apply/international-student/' target='_blank'>International Application page</a>\n• We're located in Melbourne — one of the world's most liveable cities\n• We also have a campus in Brisbane\n• Accommodation support available: <a href='https://ozford.edu.au/admissions/accommodation/' target='_blank'>View accommodation options</a>\n• <a href='https://ozford.edu.au/about/study-in-melbourne-australia/' target='_blank'>Learn about studying in Melbourne</a>",
+      replies: ["💰 Fees & payment", "📅 Intakes & dates", "📞 Contact us", "🔙 Back to start"]
+    },
+    "🌏 International student": {
+      text: "Ozford warmly welcomes international students! Here's what you need to know:\n\n• Apply via our <a href='https://ozford.edu.au/admissions/how-to-apply/international-student/' target='_blank'>International Application page</a>\n• We're located in Melbourne — one of the world's most liveable cities\n• We also have a campus in Brisbane\n• Accommodation support: <a href='https://ozford.edu.au/admissions/accommodation/' target='_blank'>View options</a>\n• <a href='https://ozford.edu.au/about/authorized-agents/' target='_blank'>Find an authorised agent</a> in your country",
+      replies: ["💰 Fees & payment", "📅 Intakes & dates", "📞 Contact us", "🔙 Back to start"]
+    },
+
+    "💰 Fees & payment": {
+      text: "For 2026 fee information, please visit our <a href='https://ozford.edu.au/admissions/fees/' target='_blank'>Fees page</a> where you can select domestic or international student to see relevant fees.\n\nPayment options include:\n• Online payment\n• Bank transfer\n• FEE-HELP (eligible domestic students)\n\n📅 View <a href='https://ozford.edu.au/admissions/fees/#payment_due_dates' target='_blank'>Payment Due Dates</a>\n💳 View <a href='https://ozford.edu.au/admissions/fees/#payment_methods' target='_blank'>Payment Methods</a>",
+      replies: ["ℹ️ FEE-HELP info", "📅 Intakes & dates", "🔙 Back to start"]
+    },
+    "ℹ️ FEE-HELP info": {
+      text: "FEE-HELP is a government loan scheme available to eligible domestic students to help pay their tuition fees.\n\n📋 To find out if you qualify and how to apply, visit our <a href='https://ozford.edu.au/admissions/fees/#fee_help' target='_blank'>FEE-HELP page</a> or contact our admissions team:\n\n📧 admissions@ozford.edu.au\n📞 +61 3 8663 7188",
+      replies: ["💰 Fees & payment", "📞 Contact us", "🔙 Back to start"]
+    },
+
+    "📍 Location & campus": {
+      text: "Ozford has two campuses in Australia:\n\n🏢 <strong>Melbourne (Head Office)</strong>\n333 Queen Street, Melbourne VIC 3000\nHeart of the city — close to transport, libraries & entertainment\n\n🏢 <strong>Brisbane Campus</strong>\n433 Boundary Street, Spring Hill QLD 4000\n\n🕐 Office hours: 8:30 AM – 5:00 PM (AEST)\n\nMelbourne is consistently ranked one of the world's most liveable cities!",
+      replies: ["📞 Contact us", "🌏 International students", "🔙 Back to start"]
+    },
+
+    "📞 Contact us": {
+      text: "We'd love to hear from you! Here's how to reach us:\n\n📞 <strong>Phone:</strong> +61 3 8663 7188\n📧 <strong>Email:</strong> info@ozford.edu.au\n📧 <strong>Admissions:</strong> admissions@ozford.edu.au\n🌐 <strong>Website:</strong> <a href='https://ozford.edu.au/about/contact-us/' target='_blank'>Contact page</a>\n\n🕐 Monday – Friday, 8:30 AM – 5:00 PM (AEST)",
+      replies: ["🎓 How to apply", "📚 Courses offered", "🔙 Back to start"]
+    },
+
+    "📅 Intakes & dates": {
+      text: "Ozford has multiple intakes throughout the year.\n\n📅 View our full <a href='https://ozford.edu.au/admissions/intakes/' target='_blank'>Intakes & Term Dates</a> page for the latest schedule.\n\n📋 Orientation information is also available: <a href='https://ozford.edu.au/admissions/orientations/' target='_blank'>View Orientations</a>",
+      replies: ["🎓 How to apply", "💰 Fees & payment", "🔙 Back to start"]
+    },
+
+    "🔙 Back to start": {
+      text: "No worries! What else can I help you with?",
+      replies: ["📚 Courses offered", "🎓 How to apply", "💰 Fees & payment", "📍 Location & campus", "📞 Contact us", "🌏 International students"]
+    }
+  }
+};
+
+const messagesEl = document.getElementById('oz-messages');
+const repliesEl = document.getElementById('oz-replies');
+const bubble = document.getElementById('oz-bubble');
+const panel = document.getElementById('oz-panel');
+let isOpen = false;
+
+bubble.addEventListener('click', () => {
+  isOpen = !isOpen;
+  panel.classList.toggle('open', isOpen);
+  bubble.classList.toggle('open', isOpen);
+  if (isOpen && messagesEl.children.length === 0) initChat();
+});
+
+function initChat() {
+  addBotMessage(DATA.welcome.text, DATA.welcome.replies);
+}
+
+function addBotMessage(text, replies) {
+  const typing = document.createElement('div');
+  typing.className = 'oz-msg bot';
+  typing.innerHTML = '<div class="oz-bubble-bot"><div class="oz-typing"><span></span><span></span><span></span></div></div>';
+  messagesEl.appendChild(typing);
+  scrollBottom();
+
+  setTimeout(() => {
+    typing.remove();
+    const msg = document.createElement('div');
+    msg.className = 'oz-msg bot';
+    const bubble = document.createElement('div');
+    bubble.className = 'oz-bubble-bot';
+    bubble.innerHTML = text.replace(/\n/g, '<br>');
+    msg.appendChild(bubble);
+    messagesEl.appendChild(msg);
+    setReplies(replies);
+    scrollBottom();
+  }, 650);
+}
+
+function addUserMessage(text) {
+  clearReplies();
+  const msg = document.createElement('div');
+  msg.className = 'oz-msg user';
+  const bub = document.createElement('div');
+  bub.className = 'oz-bubble-user';
+  bub.textContent = text;
+  msg.appendChild(bub);
+  messagesEl.appendChild(msg);
+  scrollBottom();
+}
+
+function setReplies(replies) {
+  clearReplies();
+  replies.forEach(r => {
+    const btn = document.createElement('button');
+    btn.className = 'oz-reply-btn';
+    btn.textContent = r;
+    btn.addEventListener('click', () => handleReply(r));
+    repliesEl.appendChild(btn);
+  });
+}
+
+function clearReplies() {
+  repliesEl.innerHTML = '';
+}
+
+function handleReply(key) {
+  addUserMessage(key);
+  const node = DATA.nodes[key];
+  if (node) {
+    addBotMessage(node.text, node.replies);
+  } else {
+    addBotMessage("I'm not sure about that. Please contact our team directly:\n\n📞 +61 3 8663 7188\n📧 info@ozford.edu.au", ["🔙 Back to start"]);
+  }
+}
+
+function scrollBottom() {
+  setTimeout(() => messagesEl.scrollTop = messagesEl.scrollHeight, 50);
+}
+</script>
+</body>
+</html>
